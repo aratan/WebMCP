@@ -1,0 +1,2 @@
+# WebMCP
+canary chrome + ollama
