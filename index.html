@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛒 WebMCP Nativo - Chrome Canary</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1e293b; }
+    .status { padding: 1rem; border-radius: 8px; margin: 1rem 0; font-weight: 500; }
+    .ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .warn { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .btn { background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin: 0.25rem 0; }
+    .btn:hover { background: #1d4ed8; }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .result { background: #f1f5f9; padding: 1rem; border-radius: 6px; margin-top: 1rem; font-family: ui-monospace, monospace; white-space: pre-wrap; }
+    code { background: #e2e8f0; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>🛒 WebMCP Nativo en Chrome Canary</h1>
+  <p>Exponiendo herramientas para la IA integrada del navegador.</p>
+
+  <!-- Estado -->
+  <div id="status" class="status warn">🔄 Detectando WebMCP nativo...</div>
+
+  <!-- Panel de prueba -->
+  <div id="testPanel" class="card hidden">
+    <h3>🧪 Probar herramienta</h3>
+    <p><code>obtener_precio_con_descuento</code></p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end;">
+      <label>Precio (€)<br>
+        <input type="number" id="precio" value="100" min="0" step="0.01" style="width:100px;padding:0.3rem;">
+      </label>
+      <label>Descuento (%)<br>
+        <input type="number" id="porcentaje" value="15" min="0" max="100" step="0.1" style="width:80px;padding:0.3rem;">
+      </label>
+      <button id="btnTest" class="btn">▶ Calcular</button>
+    </div>
+    <div id="result" class="result hidden"></div>
+  </div>
+
+  <!-- Info técnica -->
+  <details>
+    <summary>🔧 Diagnóstico para desarrolladores</summary>
+    <div class="card">
+      <p><strong>API disponible:</strong> <code id="apiMethods">Detectando...</code></p>
+      <p><strong>Transporte:</strong> <code id="transportInfo">N/A</code></p>
+      <button id="btnDebug" class="btn">📋 Ver detalles en consola</button>
+    </div>
+  </details>
+
+  <script>
+    // === CONFIGURACIÓN ===
+    const TOOL = {
+      name: "obtener_precio_con_descuento",
+      description: "Calcula el precio final aplicando un porcentaje de descuento",
+      schema: {
+        type: "object",
+        properties: {
+          precio: { type: "number", description: "Precio original en euros", minimum: 0 },
+          porcentaje: { type: "number", description: "Descuento (0-100)", minimum: 0, maximum: 100 }
+        },
+        required: ["precio", "porcentaje"]
+      }
+    };
+
+    // === FUNCIÓN DE LA HERRAMIENTA ===
+    async function calcularDescuento(input) {
+      const { precio, porcentaje } = input;
+      const descuento = precio * (porcentaje / 100);
+      const final = precio - descuento;
+      
+      // Formato compatible con MCP: contenido como array de bloques
+      return {
+        content: [{
+          type: "text",
+          text: `💰 Cálculo:\n• Original: ${precio.toFixed(2)} €\n• Descuento ${porcentaje}%: -${descuento.toFixed(2)} €\n✅ Final: ${final.toFixed(2)} €`
+        }]
+      };
+    }
+
+    // === INICIALIZACIÓN (sin polyfill) ===
+    window.addEventListener('load', () => {
+      const status = document.getElementById('status');
+      const testPanel = document.getElementById('testPanel');
+      const apiMethods = document.getElementById('apiMethods');
+
+      // 1. Verificar WebMCP nativo
+      if (!('modelContext' in navigator)) {
+        status.className = "status error";
+        status.innerHTML = `❌ <strong>WebMCP no disponible</strong><br>
+          • Usa <strong>Chrome Canary</strong><br>
+          • Activa: <code>chrome://flags/#enable-webmcp-for-testing</code><br>
+          • Sirve desde <code>http://localhost</code> (no file://)`;
+        return;
+      }
+
+      // 2. Verificar métodos disponibles (API experimental)
+      const ctx = navigator.modelContext;
+      const available = [];
+      if (typeof ctx.registerTool === 'function') available.push('registerTool');
+      if (typeof ctx.provideContext === 'function') available.push('provideContext');
+      if (typeof ctx.clearContext === 'function') available.push('clearContext');
+      // listTools puede no estar aún en versiones experimentales
+      if (typeof ctx.listTools === 'function') available.push('listTools');
+
+      apiMethods.textContent = available.join(', ') || 'ninguno conocido';
+
+      // 3. Registrar herramienta (método que SÍ debe existir)
+      try {
+        ctx.registerTool({
+          name: TOOL.name,
+          description: TOOL.description,
+          inputSchema: TOOL.schema,
+          execute: calcularDescuento
+        });
+
+        status.className = "status ok";
+        status.innerHTML = `✅ <strong>WebMCP nativo activo</strong><br>
+          Herramienta "${TOOL.name}" registrada.<br>
+          <small>La IA integrada de Chrome podrá usarla automáticamente.</small>`;
+        
+        testPanel.classList.remove('hidden');
+        console.log(`✅ WebMCP nativo: herramienta "${TOOL.name}" lista.`);
+
+      } catch (err) {
+        status.className = "status error";
+        status.innerHTML = `❌ Error al registrar: <code>${err.message}</code>`;
+        console.error("WebMCP registerTool error:", err);
+        return;
+      }
+
+      // 4. Info del transporte (si está expuesto)
+      const transportInfo = document.getElementById('transportInfo');
+      try {
+        if (ctx.transport) {
+          transportInfo.textContent = ctx.transport.constructor?.name || 'objeto transporte';
+        } else {
+          transportInfo.textContent = 'No expuesto (implementación nativa)';
+        }
+      } catch {
+        transportInfo.textContent = 'No disponible';
+      }
+    });
+
+    // === PRUEBA MANUAL ===
+    document.getElementById('btnTest').addEventListener('click', async () => {
+      const precio = parseFloat(document.getElementById('precio').value);
+      const porcentaje = parseFloat(document.getElementById('porcentaje').value);
+      const result = document.getElementById('result');
+
+      if (isNaN(precio) || isNaN(porcentaje)) {
+        alert("⚠️ Valores inválidos");
+        return;
+      }
+
+      result.classList.remove('hidden');
+      result.textContent = "⏳ Calculando...";
+
+      try {
+        const response = await calcularDescuento({ precio, porcentaje });
+        const text = response.content?.[0]?.text || JSON.stringify(response);
+        // Permitir HTML básico en la respuesta
+        result.innerHTML = text.replace(/\n/g, '<br>');
+      } catch (err) {
+        result.textContent = `❌ Error: ${err.message}`;
+      }
+    });
+
+    // === DIAGNÓSTICO EN CONSOLA ===
+    document.getElementById('btnDebug').addEventListener('click', () => {
+      console.group("🔍 WebMCP Nativo - Diagnóstico");
+      console.log("navigator.modelContext:", navigator.modelContext);
+      console.log("Métodos disponibles:", Object.getOwnPropertyNames(Object.getPrototypeOf(navigator.modelContext)));
+      console.log("Herramienta registrada:", {
+        name: TOOL.name,
+        schema: TOOL.schema
+      });
+      console.groupEnd();
+      alert("✅ Detalles enviados a la consola (F12 → Console)");
+    });
+  </script>
+</body>
+</html>
