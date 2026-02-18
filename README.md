@@ -69,3 +69,13 @@ navigator.modelContext.registerTool({
   }
 });
 ```
+
+🎯 Casos de uso prácticos
+Este patrón es útil cuando:
+✅ Tu aplicación ya tiene lógica de negocio en JavaScript que quieres reutilizar
+✅ Necesitas que el agente opere con los mismos permisos/autenticación del usuario
+✅ Quieres evitar mantener un servidor MCP separado para acciones simples
+✅ Estás prototipando flujos agénticos antes de escalar a backend
+
+
+
